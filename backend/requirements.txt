@@ -4,3 +4,6 @@ psycopg[binary]>=3.2
 django-cors-headers>=4.4
 django-environ>=0.11
 PyJWT[crypto]>=2.9
+# Producción
+gunicorn>=22.0
+whitenoise>=6.7

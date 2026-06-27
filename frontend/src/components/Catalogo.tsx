@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 import { useApi } from "@/lib/api";
 import type { Producto } from "@/lib/types";
+import { normalizarTexto } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,9 +36,9 @@ export function Catalogo() {
   // ir al backend por cada tecla).
   const filtrados = useMemo(() => {
     if (!productos) return [];
-    const q = busqueda.trim().toLowerCase();
+    const q = normalizarTexto(busqueda.trim());
     if (!q) return productos;
-    return productos.filter((p) => p.nombre.toLowerCase().includes(q));
+    return productos.filter((p) => normalizarTexto(p.nombre).includes(q));
   }, [productos, busqueda]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
@@ -53,19 +54,27 @@ export function Catalogo() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="relative mb-6 max-w-xl">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            setPagina(1);
-          }}
-          placeholder="Buscar producto..."
-          className="pl-9"
-          aria-label="Buscar producto"
-        />
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Catálogo</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Elige productos y arma tu carrito feliz.
+          </p>
+        </div>
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={busqueda}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setPagina(1);
+            }}
+            placeholder="Buscar producto..."
+            className="pl-9"
+            aria-label="Buscar producto"
+          />
+        </div>
       </div>
 
       {error ? (
@@ -76,6 +85,10 @@ export function Catalogo() {
         <SinResultados busqueda={busqueda} />
       ) : (
         <>
+          <p className="mb-4 text-xs text-muted-foreground">
+            {filtrados.length}{" "}
+            {filtrados.length === 1 ? "producto" : "productos"}
+          </p>
           <div className={GRID}>
             {visibles.map((p) => (
               <ProductoCard key={p.id} producto={p} />
@@ -134,7 +147,7 @@ function GridSkeleton() {
   return (
     <div className={GRID}>
       {Array.from({ length: POR_PAGINA }).map((_, i) => (
-        <Skeleton key={i} className="h-28 w-full" />
+        <Skeleton key={i} className="h-44 w-full" />
       ))}
     </div>
   );

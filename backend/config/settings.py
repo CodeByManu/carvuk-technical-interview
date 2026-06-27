@@ -26,6 +26,18 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default="dev-insecure-change-me")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
+# En Railway, el dominio público del servicio se inyecta como env var. Lo
+# agregamos automáticamente a hosts y orígenes confiables para no hardcodearlo.
+RAILWAY_PUBLIC_DOMAIN = env("RAILWAY_PUBLIC_DOMAIN", default="")
+CSRF_TRUSTED_ORIGINS = []
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RAILWAY_PUBLIC_DOMAIN}")
+
+# Detrás del proxy de Railway (TLS terminado ahí), confiar en el header que marca
+# que la request original era HTTPS.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # --- Aplicaciones -----------------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -42,6 +54,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # whitenoise sirve los estáticos en producción (justo después de Security).
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     # corsheaders debe ir lo más arriba posible, antes de CommonMiddleware.
     "corsheaders.middleware.CorsMiddleware",
@@ -123,6 +137,14 @@ USE_TZ = True
 
 # --- Archivos estáticos -----------------------------------------------------
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+# whitenoise comprime y cachea los estáticos recolectados (admin, etc.).
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    },
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -151,8 +173,16 @@ SII_EMISION_URL = env(
     "SII_EMISION_URL", default="https://eoej5sf0r8zkoh2.m.pipedream.net"
 )
 # Base pública con la que se arma el callbackUrl del webhook. En local con ngrok,
-# poné acá la URL del túnel; en producción, el dominio del backend.
-PUBLIC_BASE_URL = env("PUBLIC_BASE_URL", default="http://localhost:8000")
+# poné acá la URL del túnel; en producción usa el dominio del backend (en Railway
+# se deriva solo del dominio público del servicio).
+PUBLIC_BASE_URL = env(
+    "PUBLIC_BASE_URL",
+    default=(
+        f"https://{RAILWAY_PUBLIC_DOMAIN}"
+        if RAILWAY_PUBLIC_DOMAIN
+        else "http://localhost:8000"
+    ),
+)
 # Secreto compartido para autenticar el webhook del SII. Se incluye como
 # `?token=` en el callbackUrl y se verifica al recibir el callback. Si queda
 # vacío, el webhook no exige token (cómodo en dev, pero conviene setearlo).
