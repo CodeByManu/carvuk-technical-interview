@@ -1,0 +1,34 @@
+# --- Variables de entorno (nunca versionar secretos) ---
+.env
+*.env
+!.env.example
+
+# --- Python / Django ---
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+db.sqlite3
+
+# --- Node / Vite ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+# Caché incremental de TypeScript (se regenera en cada build).
+*.tsbuildinfo
+
+# --- Docker ---
+# El volumen de Postgres es gestionado por Docker (named volume), no vive en
+# el repo. Si en algún momento se monta un bind-mount local, ignorarlo aquí:
+postgres_data/
+pgdata/
+
+# --- Editores / OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
