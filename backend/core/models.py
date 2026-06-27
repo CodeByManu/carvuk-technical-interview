@@ -29,6 +29,16 @@ class Boleta(models.Model):
     usuario que la emitió, identificado por su `clerk_id`.
     """
 
+    # Estados de la emisión asíncrona contra el SII (Bonus 2).
+    ESTADO_PENDIENTE = "pendiente"
+    ESTADO_EMITIDA = "emitida"
+    ESTADO_ERROR = "error"
+    ESTADOS_SII = [
+        (ESTADO_PENDIENTE, "Pendiente"),
+        (ESTADO_EMITIDA, "Emitida"),
+        (ESTADO_ERROR, "Error"),
+    ]
+
     clerk_id = models.CharField(max_length=255, db_index=True)
     creada_en = models.DateTimeField(auto_now_add=True)
 
@@ -36,6 +46,14 @@ class Boleta(models.Model):
     bruto = models.PositiveIntegerField()
     impuesto = models.PositiveIntegerField()
     neto = models.PositiveIntegerField()
+
+    # Emisión contra el SII (Bonus 2). Nace "pendiente"; el webhook la pasa a
+    # "emitida" con su número y PDF, o queda "error" si la solicitud falla.
+    estado_sii = models.CharField(
+        max_length=20, choices=ESTADOS_SII, default=ESTADO_PENDIENTE
+    )
+    sii_codigo = models.CharField(max_length=50, blank=True, default="")
+    pdf_url = models.URLField(blank=True, default="")
 
     class Meta:
         ordering = ["-creada_en"]

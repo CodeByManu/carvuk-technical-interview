@@ -4,6 +4,9 @@ Pertenencia: cada boleta lleva el `clerk_id` del dueño, que se setea desde el J
 verificado (`request.auth["sub"]`), nunca desde el body. Todo query se filtra por
 ese mismo id; una boleta de otro usuario responde 404.
 """
+from urllib.parse import quote
+
+from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from ninja import Router
@@ -13,6 +16,7 @@ from core.auth import ClerkAuth
 from core.impuestos import calcular_montos
 from core.models import Boleta, LineaBoleta, Producto
 from core.schemas import BoletaCrearIn, BoletaDetalleOut, BoletaResumenOut
+from core.sii import emitir_en_background
 
 router = Router(auth=ClerkAuth())
 
@@ -58,6 +62,14 @@ def crear_boleta(request, datos: BoletaCrearIn):
             ]
         )
 
+    # Bonus 2: solicitamos la emisión al SII en background (no bloquea la
+    # respuesta). El webhook actualizará la boleta cuando el SII responda.
+    callback_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/api/webhooks/sii"
+    if settings.SII_WEBHOOK_SECRET:
+        # Token compartido para que el webhook pueda autenticar el callback.
+        callback_url += f"?token={quote(settings.SII_WEBHOOK_SECRET)}"
+    emitir_en_background(boleta.id, callback_url)
+
     return 201, _a_detalle(boleta)
 
 
@@ -76,6 +88,9 @@ def listar_boletas(request):
             impuesto=b.impuesto,
             neto=b.neto,
             cantidad_items=sum(linea.cantidad for linea in b.lineas.all()),
+            estado_sii=b.estado_sii,
+            sii_codigo=b.sii_codigo,
+            pdf_url=b.pdf_url,
         )
         for b in boletas
     ]
@@ -100,6 +115,9 @@ def _a_detalle(boleta: Boleta) -> BoletaDetalleOut:
         bruto=boleta.bruto,
         impuesto=boleta.impuesto,
         neto=boleta.neto,
+        estado_sii=boleta.estado_sii,
+        sii_codigo=boleta.sii_codigo,
+        pdf_url=boleta.pdf_url,
         lineas=[
             {
                 "nombre": linea.nombre,

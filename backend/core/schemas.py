@@ -44,6 +44,9 @@ class BoletaResumenOut(Schema):
     impuesto: int
     neto: int
     cantidad_items: int
+    estado_sii: str
+    sii_codigo: str
+    pdf_url: str
 
 
 class BoletaDetalleOut(Schema):
@@ -54,4 +57,20 @@ class BoletaDetalleOut(Schema):
     bruto: int
     impuesto: int
     neto: int
+    estado_sii: str
+    sii_codigo: str
+    pdf_url: str
     lineas: list[LineaBoletaOut]
+
+
+# --- Bonus 2: webhook del SII -----------------------------------------------
+class WebhookSiiIn(Schema):
+    """Cuerpo que envía el servicio externo al notificar el resultado.
+
+    Los nombres son camelCase para calzar con el payload del SII tal cual llega.
+    """
+
+    documentId: int
+    status: str
+    siiCode: str | None = None
+    pdfUrl: str | None = None

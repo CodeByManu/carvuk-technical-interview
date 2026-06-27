@@ -8,6 +8,7 @@ from ninja import NinjaAPI
 from core.auth import ClerkAuth
 from core.boletas import router as boletas_router
 from core.productos import router as productos_router
+from core.webhooks import router as webhooks_router
 
 api = NinjaAPI(title="Carvuk API")
 
@@ -33,6 +34,8 @@ def me(request):
     }
 
 
-# Routers de dominio. Cada uno exige JWT de Clerk (auth en el propio Router).
+# Routers de dominio. Productos y boletas exigen JWT de Clerk (auth en el propio
+# Router). El webhook es público: lo llama el SII, no el usuario.
 api.add_router("/productos", productos_router)
 api.add_router("/boletas", boletas_router)
+api.add_router("/webhooks", webhooks_router)

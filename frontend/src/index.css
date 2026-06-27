@@ -122,4 +122,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Al abrir un Sheet/Dialog, Radix bloquea el scroll y agrega un padding-right
+     al body para compensar la barra. Como ya reservamos ese espacio con
+     scrollbar-gutter, ese padding extra mueve el contenido: lo anulamos. */
+  body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+  }
 }

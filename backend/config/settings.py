@@ -144,3 +144,16 @@ CLERK_AUTHORIZED_PARTIES = env.list(
     "CLERK_AUTHORIZED_PARTIES",
     default=["http://localhost:5173"],
 )
+
+# --- Bonus 2: emisión asíncrona contra el SII (simulado por Pipedream) -------
+# Endpoint externo al que solicitamos la emisión del documento.
+SII_EMISION_URL = env(
+    "SII_EMISION_URL", default="https://eoej5sf0r8zkoh2.m.pipedream.net"
+)
+# Base pública con la que se arma el callbackUrl del webhook. En local con ngrok,
+# poné acá la URL del túnel; en producción, el dominio del backend.
+PUBLIC_BASE_URL = env("PUBLIC_BASE_URL", default="http://localhost:8000")
+# Secreto compartido para autenticar el webhook del SII. Se incluye como
+# `?token=` en el callbackUrl y se verifica al recibir el callback. Si queda
+# vacío, el webhook no exige token (cómodo en dev, pero conviene setearlo).
+SII_WEBHOOK_SECRET = env("SII_WEBHOOK_SECRET", default="")

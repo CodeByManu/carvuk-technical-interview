@@ -13,6 +13,9 @@ export interface LineaBoleta {
   subtotal: number;
 }
 
+// Estado de la emisión contra el SII (Bonus 2).
+export type EstadoSii = "pendiente" | "emitida" | "error";
+
 export interface BoletaResumen {
   id: number;
   creada_en: string;
@@ -20,6 +23,9 @@ export interface BoletaResumen {
   impuesto: number;
   neto: number;
   cantidad_items: number;
+  estado_sii: EstadoSii;
+  sii_codigo: string;
+  pdf_url: string;
 }
 
 export interface BoletaDetalle {
@@ -28,6 +34,9 @@ export interface BoletaDetalle {
   bruto: number;
   impuesto: number;
   neto: number;
+  estado_sii: EstadoSii;
+  sii_codigo: string;
+  pdf_url: string;
   lineas: LineaBoleta[];
 }
 

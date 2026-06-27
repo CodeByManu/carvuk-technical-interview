@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Eye, Receipt } from "lucide-react";
+import { Eye, Receipt, RefreshCw } from "lucide-react";
 
 import { useApi } from "@/lib/api";
 import type { BoletaResumen } from "@/lib/types";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BoletaDetalleDialog } from "@/components/BoletaDetalleDialog";
+import { EstadoSiiBadge } from "@/components/EstadoSiiBadge";
 
 function etiquetaItems(n: number): string {
   return `${n} ${n === 1 ? "ítem" : "ítems"}`;
@@ -34,7 +35,18 @@ export function Boletas() {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-      <h1 className="mb-6 text-lg font-semibold">Historial de boletas</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Historial de boletas</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={cargar}
+          disabled={boletas === null}
+        >
+          <RefreshCw className="size-4" />
+          Actualizar
+        </Button>
+      </div>
 
       {error ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -66,7 +78,10 @@ export function Boletas() {
                       <Receipt className="size-5" />
                     </span>
                     <div>
-                      <p className="font-medium">Boleta #{b.id}</p>
+                      <p className="flex items-center gap-2 font-medium">
+                        Boleta #{b.id}
+                        <EstadoSiiBadge estado={b.estado_sii} />
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {formatearFecha(b.creada_en)} · {etiquetaItems(b.cantidad_items)}
                       </p>

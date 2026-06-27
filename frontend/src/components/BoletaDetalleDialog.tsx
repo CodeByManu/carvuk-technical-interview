@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ExternalLink, FileText } from "lucide-react";
 
 import { useApi } from "@/lib/api";
 import type { BoletaDetalle } from "@/lib/types";
@@ -12,6 +13,13 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EstadoSiiBadge } from "@/components/EstadoSiiBadge";
+
+// Solo permitimos abrir enlaces http(s); evita esquemas peligrosos como
+// "javascript:" en el href (XSS).
+function esUrlSegura(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
 
 // Detalle de una boleta: productos que incluía y el desglose neto / impuesto /
 // total. Se carga al abrir (cuando `id` deja de ser null).
@@ -48,7 +56,10 @@ export function BoletaDetalleDialog({
     <Dialog open={id !== null} onOpenChange={(abierto) => !abierto && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{detalle ? `Boleta #${detalle.id}` : "Boleta"}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>{detalle ? `Boleta #${detalle.id}` : "Boleta"}</DialogTitle>
+            {detalle && <EstadoSiiBadge estado={detalle.estado_sii} />}
+          </div>
           <DialogDescription>
             {detalle ? formatearFecha(detalle.creada_en) : "Cargando detalle..."}
           </DialogDescription>
@@ -101,6 +112,41 @@ export function BoletaDetalleDialog({
               <Fila etiqueta="Impuesto (15%)" valor={detalle.impuesto} />
               <Fila etiqueta="Total" valor={detalle.bruto} fuerte />
             </dl>
+
+            {/* Datos del SII (Bonus 2): aparecen cuando el webhook ya respondió. */}
+            {detalle.estado_sii === "emitida" &&
+            (detalle.sii_codigo || detalle.pdf_url) ? (
+              <>
+                <Separator />
+                <div className="space-y-2 text-sm">
+                  {detalle.sii_codigo ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Número SII</span>
+                      <span className="font-medium tabular-nums">
+                        {detalle.sii_codigo}
+                      </span>
+                    </div>
+                  ) : null}
+                  {esUrlSegura(detalle.pdf_url) ? (
+                    <a
+                      href={detalle.pdf_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 font-medium text-emerald-700 hover:underline"
+                    >
+                      <FileText className="size-4" />
+                      Ver PDF
+                      <ExternalLink className="size-3" />
+                    </a>
+                  ) : null}
+                </div>
+              </>
+            ) : detalle.estado_sii === "pendiente" ? (
+              <p className="text-xs text-muted-foreground">
+                La emisión en el SII está pendiente. Vuelve a abrir o actualiza el
+                historial en unos segundos.
+              </p>
+            ) : null}
           </>
         )}
       </DialogContent>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 import { useApi } from "@/lib/api";
 import type { Producto } from "@/lib/types";
@@ -8,14 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductoCard } from "@/components/ProductoCard";
 
-const GRID =
-  "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6";
+const POR_PAGINA = 15;
+const GRID = "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5";
 
 export function Catalogo() {
   const api = useApi();
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const [pagina, setPagina] = useState(1);
 
   const cargar = useCallback(() => {
     setError(null);
@@ -39,13 +40,28 @@ export function Catalogo() {
     return productos.filter((p) => p.nombre.toLowerCase().includes(q));
   }, [productos, busqueda]);
 
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+
+  // Si la búsqueda reduce los resultados, no quedarse en una página inexistente.
+  useEffect(() => {
+    setPagina((p) => Math.min(p, totalPaginas));
+  }, [totalPaginas]);
+
+  const visibles = filtrados.slice(
+    (pagina - 1) * POR_PAGINA,
+    pagina * POR_PAGINA,
+  );
+
   return (
-    <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
       <div className="relative mb-6 max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
+          onChange={(e) => {
+            setBusqueda(e.target.value);
+            setPagina(1);
+          }}
           placeholder="Buscar producto..."
           className="pl-9"
           aria-label="Buscar producto"
@@ -59,12 +75,57 @@ export function Catalogo() {
       ) : filtrados.length === 0 ? (
         <SinResultados busqueda={busqueda} />
       ) : (
-        <div className={GRID}>
-          {filtrados.map((p) => (
-            <ProductoCard key={p.id} producto={p} />
-          ))}
-        </div>
+        <>
+          <div className={GRID}>
+            {visibles.map((p) => (
+              <ProductoCard key={p.id} producto={p} />
+            ))}
+          </div>
+          <Paginador
+            pagina={pagina}
+            totalPaginas={totalPaginas}
+            onCambiar={setPagina}
+          />
+        </>
       )}
+    </div>
+  );
+}
+
+function Paginador({
+  pagina,
+  totalPaginas,
+  onCambiar,
+}: {
+  pagina: number;
+  totalPaginas: number;
+  onCambiar: (p: number) => void;
+}) {
+  if (totalPaginas <= 1) return null;
+
+  return (
+    <div className="mt-8 flex items-center justify-center gap-2">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => onCambiar(pagina - 1)}
+        disabled={pagina === 1}
+        aria-label="Página anterior"
+      >
+        <ChevronLeft className="size-4" />
+      </Button>
+      <span className="px-2 text-sm text-muted-foreground tabular-nums">
+        Página {pagina} de {totalPaginas}
+      </span>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => onCambiar(pagina + 1)}
+        disabled={pagina === totalPaginas}
+        aria-label="Página siguiente"
+      >
+        <ChevronRight className="size-4" />
+      </Button>
     </div>
   );
 }
@@ -72,7 +133,7 @@ export function Catalogo() {
 function GridSkeleton() {
   return (
     <div className={GRID}>
-      {Array.from({ length: 8 }).map((_, i) => (
+      {Array.from({ length: POR_PAGINA }).map((_, i) => (
         <Skeleton key={i} className="h-28 w-full" />
       ))}
     </div>

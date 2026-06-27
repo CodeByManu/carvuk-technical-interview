@@ -1,66 +1,62 @@
-# Carvuk — Monorepo full stack
+# Carrito Feliz — Carvuk
 
-Monorepo de tres piezas que se comunican: base de datos Postgres (Supabase, con
-Docker local como alternativa), API en Django + django-ninja y SPA en Vite +
-React 19. La autenticación es con **Clerk** (JWT verificado de forma stateless
-en el backend) y la UI usa **shadcn/ui** sobre Tailwind v4.
+Mini e-commerce de barrio: catálogo de productos, carrito de compras y generación
+de **boletas** con cálculo automático de impuesto, historial por usuario y
+emisión asíncrona contra un servicio externo (SII simulado) vía **webhook**.
+
+- **Backend**: Django + django-ninja (API REST en `/api`), Postgres en Supabase.
+- **Frontend**: React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui.
+- **Auth**: Clerk (JWT verificado de forma stateless contra su JWKS).
+
+## Funcionalidades
+
+- **Catálogo** (`/`): 22 productos sembrados, con buscador en vivo y paginación
+  (15 por página).
+- **Carrito** (panel lateral): agregar/quitar con cantidades, vive solo en el
+  frontend. Se puede sumar/restar desde la misma tarjeta del producto.
+- **Generar boleta**: crea la boleta desde el carrito; los montos se calculan en
+  el backend (nunca se confían al cliente).
+- **Historial** (`/receipt`): lista de boletas del usuario con su estado de
+  emisión; el detalle muestra el desglose y, cuando está emitida, el Número SII
+  y el link al PDF.
+- **Bonus 1 — Auth Clerk**: toda la API (salvo el webhook) exige sesión.
+- **Bonus 2 — Emisión asíncrona + webhook**: ver sección dedicada abajo.
+
+## Cálculo del impuesto
+
+Impuesto **fijo del 15%**, calculado siempre en el backend
+(`backend/core/impuestos.py`). Siguiendo el ejemplo del enunciado, el **bruto** es
+el total a pagar por el cliente (la suma del carrito):
 
 ```
-.
-├── backend/           # Django + django-ninja, API montada en /api
-├── frontend/          # Vite + React 19 + TypeScript + Tailwind v4 + shadcn/ui
-├── docker-compose.yml # Postgres 16 local (alternativa a Supabase)
-└── .env.example       # Credenciales de Postgres para docker-compose
+bruto    = suma de precios del carrito        (ej. $4.200)
+impuesto = round(bruto * 15%)                  (ej. $630)
+neto     = bruto - impuesto                    (ej. $3.570)
 ```
 
-## Stack
-
-| Capa     | Tecnología                                                  |
-| -------- | ----------------------------------------------------------- |
-| Backend  | Python · Django · django-ninja · psycopg v3                 |
-| Auth     | Clerk (JWT/JWKS, stateless)                                 |
-| Frontend | Vite · React 19 · TypeScript · Tailwind v4 · shadcn/ui      |
-| DB       | Postgres — Supabase (o Postgres 16 local vía docker-compose)|
-
-## Requisitos
-
-- Python 3.11+
-- Node 18+
-- Docker + Docker Compose (solo si usás Postgres local en vez de Supabase)
-- Una cuenta de [Clerk](https://dashboard.clerk.com) y, opcionalmente, de
-  [Supabase](https://supabase.com)
+Montos en CLP enteros (sin decimales). Se cumple `neto + impuesto = total`.
 
 ---
 
-## Levantar todo desde cero
+## Levantar en local
 
-Ejecutá cada bloque en orden. Los pasos 3 y 4 usan terminales separadas
-(Django y Vite quedan corriendo en foreground).
+### Requisitos
+
+- Python 3.11+ · Node 18+
+- Cuenta de [Clerk](https://dashboard.clerk.com). La DB ya apunta a Supabase; si
+  preferís Postgres local hay un `docker-compose.yml` de respaldo.
 
 ### 0. Variables de entorno
 
 ```bash
-cp .env.example .env                 # raíz (Postgres para docker-compose)
-cp backend/.env.example backend/.env # backend (DB + Clerk)
+cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Completá los valores reales (ver **Configuración** abajo): la DB en
-`backend/.env` y las claves de Clerk en `backend/.env` y `frontend/.env`.
+Completá en `backend/.env` los datos de la DB (bloque Supabase) y de Clerk
+(`CLERK_ISSUER`), y en `frontend/.env` la `VITE_CLERK_PUBLISHABLE_KEY`.
 
-### 1. Base de datos
-
-**Opción A — Supabase (gestionada):** en `backend/.env`, usá el bloque
-`SUPABASE` (datos del dashboard → Connect → Session Pooler). No requiere Docker.
-
-**Opción B — Postgres local (Docker):**
-
-```bash
-docker compose up -d
-docker compose ps          # el healthcheck debe estar "healthy"
-```
-
-### 2. Migraciones + 3. Backend (Django) — terminal A
+### 1. Backend (terminal A)
 
 ```bash
 cd backend
@@ -71,16 +67,10 @@ python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
 ```
 
-Verificación rápida:
+Verificación: `curl http://localhost:8000/api/health` → `{"status": "ok"}`.
+Docs interactivas: http://localhost:8000/api/docs
 
-```bash
-curl http://localhost:8000/api/health
-# -> {"status": "ok"}
-```
-
-Docs interactivas de la API (django-ninja): http://localhost:8000/api/docs
-
-### 4. Frontend (Vite) — terminal B
+### 2. Frontend (terminal B)
 
 ```bash
 cd frontend
@@ -88,68 +78,112 @@ npm install
 npm run dev
 ```
 
-Abrí http://localhost:5173. Si no hay sesión, se muestra la pantalla de
-**login**; al iniciar sesión con Clerk, una pantalla con tu nombre y un botón de
-**cerrar sesión**.
+Abrí http://localhost:5173 → pantalla de inicio de sesión / registro de Clerk.
+
+### Tests del backend
+
+```bash
+cd backend
+python manage.py test          # corren sobre SQLite en memoria (no tocan Supabase)
+```
 
 ---
 
-## Configuración
+## Bonus 2 — Emisión asíncrona + webhook
 
-### Clerk (autenticación stateless)
+Al generar una boleta, el backend solicita la emisión al servicio externo
+(Pipedream, que simula el SII) con un `POST` a `SII_EMISION_URL`:
 
-El frontend hace login con Clerk y recibe un JWT; el backend lo verifica con las
-claves públicas de Clerk (JWKS), sin guardar usuarios en su DB.
+```json
+{ "callbackUrl": "https://<base-publica>/api/webhooks/sii", "documentId": <id-boleta> }
+```
 
-1. Creá una app en [dashboard.clerk.com](https://dashboard.clerk.com) y copiá:
-   - **Publishable key** (`pk_test_...`) → `frontend/.env` → `VITE_CLERK_PUBLISHABLE_KEY`
-   - **Frontend API URL** (issuer) → `backend/.env` → `CLERK_ISSUER`
-2. (Opcional) Para recibir el email en `/api/me`: en el dashboard, **Sessions →
-   Customize session token**, agregá `{ "email": "{{user.primary_email_address}}" }`.
-   Por defecto el token de sesión solo trae `sub` y `sid`.
+El servicio responde **asíncronamente** llamando a ese `callbackUrl`:
 
-### Base de datos
+```json
+{ "documentId": 123, "status": "issued", "siiCode": "SII-123456", "pdfUrl": "https://....pdf" }
+```
 
-- **Supabase**: en `backend/.env`, completá el bloque `SUPABASE` con los datos
-  del **Session Pooler** y `POSTGRES_SSLMODE=require`.
-- **Local (Docker)**: usá el bloque `LOCAL`; las credenciales deben coincidir
-  con las del `.env` de la raíz que consume docker-compose.
+Flujo en el código:
 
-El conmutador es solo cuestión de qué bloque está activo en `backend/.env`; el
-código (`config/settings.py`) es el mismo para ambos.
+1. La boleta nace con `estado_sii = "pendiente"`. La solicitud al SII se dispara
+   en un **thread en background** (`backend/core/sii.py`) para no bloquear la
+   respuesta.
+2. El webhook **público** `POST /api/webhooks/sii` (`backend/core/webhooks.py`)
+   recibe el resultado, ubica la boleta por `documentId` (= su id) y la pasa a
+   `emitida` con su Número SII y PDF.
+3. En el frontend, el historial muestra el estado con un badge; el botón
+   **Actualizar** vuelve a consultar para ver el paso `pendiente → emitida`.
 
-## Cómo está cableado
+> **Nota de límite**: el endpoint del SII tiene **100 requests** disponibles.
+> Cada boleta generada consume 1. Los tests **mockean** esta llamada y nunca le
+> pegan de verdad.
 
-- **Auth**: `ClerkProvider` envuelve la app (`frontend/src/main.tsx`). El backend
-  valida el `Authorization: Bearer <jwt>` en `backend/core/auth.py` (`ClerkAuth`).
-- **CORS**: `django-cors-headers` permite el origen `http://localhost:5173`
-  (configurable en `backend/.env` → `CORS_ALLOWED_ORIGINS`).
-- **DB**: Django se conecta vía `django-environ` con las variables `POSTGRES_*`
-  de `backend/.env`. TLS configurable con `POSTGRES_SSLMODE`.
-- **API**: django-ninja se monta en `/api` (`config/urls.py`). Los endpoints
-  viven en `backend/core/api.py`. Nuevos dominios → `api.add_router(...)`.
-- **Frontend → backend**: la URL sale de `VITE_API_URL` (`frontend/.env`),
-  default `http://localhost:8000/api`.
-- **UI**: shadcn/ui (`frontend/src/components/ui/`), helper `cn` en
-  `src/lib/utils.ts`, tema (tokens Tailwind v4) en `src/index.css`. Nuevos
-  componentes: `npx shadcn@latest add <componente>`.
+### Cómo recibir el webhook en local (ngrok)
+
+Como Pipedream no puede llamar a `localhost`, se expone el backend con un túnel:
+
+```bash
+# 1. Con el backend corriendo en :8000, en otra terminal:
+ngrok http 8000
+# 2. Copiá la URL pública que da ngrok, ej: https://abcd1234.ngrok-free.app
+```
+
+En `backend/.env` seteá esa URL como base pública del callback y permití el host:
+
+```bash
+PUBLIC_BASE_URL=https://abcd1234.ngrok-free.app
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,.ngrok-free.app
+```
+
+Reiniciá el backend. Ahora, al generar una boleta:
+
+- El SII recibe la solicitud y llama de vuelta a
+  `https://abcd1234.ngrok-free.app/api/webhooks/sii`.
+- La boleta pasa a **Emitida** (botón **Actualizar** en el historial) con su
+  Número SII y el link al PDF.
+
+---
 
 ## Endpoints
 
-| Método | Ruta          | Auth         | Respuesta                          |
-| ------ | ------------- | ------------ | ---------------------------------- |
-| GET    | `/api/health` | pública      | `{"status": "ok"}`                 |
-| GET    | `/api/me`     | Bearer (JWT) | `{clerk_id, session_id, email}`    |
+| Método | Ruta                    | Auth         | Descripción                                |
+| ------ | ----------------------- | ------------ | ------------------------------------------ |
+| GET    | `/api/health`           | pública      | Liveness check                             |
+| GET    | `/api/me`               | Bearer (JWT) | Claims del usuario                         |
+| GET    | `/api/productos`        | Bearer (JWT) | Catálogo                                   |
+| POST   | `/api/boletas`          | Bearer (JWT) | Crea boleta desde el carrito               |
+| GET    | `/api/boletas`          | Bearer (JWT) | Historial del usuario                      |
+| GET    | `/api/boletas/{id}`     | Bearer (JWT) | Detalle (404 si es de otro usuario)        |
+| POST   | `/api/webhooks/sii`     | pública      | Webhook de resultado de emisión (SII)      |
 
-## Apagar
+---
 
-```bash
-# Ctrl+C en las terminales de Django y Vite. Si usás Docker:
-docker compose down          # detiene Postgres, conserva los datos
-docker compose down -v       # además borra el volumen (datos)
+## Supuestos tomados
+
+- **Catálogo global de solo lectura**, sembrado por migración (los productos son
+  de la tienda). Las **boletas son por usuario** (columna `clerk_id`); la
+  identidad sale siempre del JWT (`request.auth["sub"]`), nunca del body.
+- **Impuesto** según el ejemplo literal del enunciado (`bruto = total del
+  carrito`, `impuesto = 15% del bruto`, `neto = bruto − impuesto`).
+- El **carrito** vive solo en el frontend (sin persistencia), con cantidades.
+- Cada **línea de boleta** guarda un *snapshot* de nombre y precio: la boleta
+  histórica no cambia si después cambia el precio del producto.
+- El **estado de emisión se refresca manualmente** (botón Actualizar), sin
+  polling automático.
+- El **webhook es público** (sin firma) por simplicidad del ejercicio; en
+  producción se aseguraría con un secreto/HMAC.
+- **RLS habilitado** (deny-all) en las tablas de dominio para cerrar la Data API
+  de Supabase; Django se conecta como rol `postgres` (que tiene BYPASSRLS), así
+  que no lo afecta. Ver migración `core/0003_habilitar_rls`.
+- **Tests sobre SQLite en memoria** (rápidos y aislados; el dominio no usa nada
+  específico de Postgres).
+
+## Estructura
+
 ```
-
-## Próximos pasos
-
-Modelos de negocio y endpoints de dominio protegidos con `ClerkAuth`, con
-pertenencia por usuario (columna `clerk_id`, filtrando por `request.auth["sub"]`).
+backend/   Django + django-ninja. Dominio en core/ (models, impuestos, productos,
+           boletas, sii, webhooks, schemas, auth). Migraciones versionadas.
+frontend/  Vite + React 19. UI en src/components, estado de carrito y cliente API
+           en src/lib. Componentes shadcn/ui en src/components/ui.
+```
