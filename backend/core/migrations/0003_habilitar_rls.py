@@ -13,11 +13,21 @@ from django.db import migrations
 TABLAS = ["core_producto", "core_boleta", "core_lineaboleta"]
 
 
-def _sql(accion: str) -> str:
-    # accion: "ENABLE" o "DISABLE"
-    return "".join(
-        f"ALTER TABLE {tabla} {accion} ROW LEVEL SECURITY;\n" for tabla in TABLAS
-    )
+def _aplicar(accion: str):
+    """Devuelve una función de migración que activa/desactiva RLS en Postgres.
+
+    Es no-op fuera de Postgres (p. ej. el SQLite que usamos en tests), donde RLS
+    no existe.
+    """
+
+    def run(apps, schema_editor):
+        if schema_editor.connection.vendor != "postgresql":
+            return
+        with schema_editor.connection.cursor() as cursor:
+            for tabla in TABLAS:
+                cursor.execute(f"ALTER TABLE {tabla} {accion} ROW LEVEL SECURITY;")
+
+    return run
 
 
 class Migration(migrations.Migration):
@@ -27,8 +37,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql=_sql("ENABLE"),
-            reverse_sql=_sql("DISABLE"),
-        ),
+        migrations.RunPython(_aplicar("ENABLE"), _aplicar("DISABLE")),
     ]

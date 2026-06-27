@@ -5,6 +5,7 @@ Las credenciales sensibles y la configuración por ambiente se leen desde
 variables de entorno usando django-environ. En desarrollo, esas variables
 se cargan desde backend/.env (ver .env.example).
 """
+import sys
 from pathlib import Path
 
 import environ
@@ -96,6 +97,15 @@ DATABASES = {
         "CONN_MAX_AGE": env.int("POSTGRES_CONN_MAX_AGE", default=60),
     }
 }
+
+# Tests: SQLite en memoria. Es rápido, aislado y no crea ni borra bases en
+# Supabase (el pooler deja sesiones abiertas que impiden el DROP de la DB de
+# test). El dominio no usa nada específico de Postgres, así que es seguro.
+if "test" in sys.argv:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
 
 # --- Validación de contraseñas ----------------------------------------------
 AUTH_PASSWORD_VALIDATORS = [
