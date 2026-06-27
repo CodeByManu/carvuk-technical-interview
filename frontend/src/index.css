@@ -114,6 +114,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Reserva siempre el espacio de la barra de scroll para que el contenido no
+     salte horizontalmente cuando aparece/desaparece. */
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
   }

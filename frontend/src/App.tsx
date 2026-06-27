@@ -1,85 +1,37 @@
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  SignOutButton,
-  useUser,
-} from "@clerk/clerk-react";
+import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Header } from "@/components/Header";
+import { Catalogo } from "@/components/Catalogo";
+import { Boletas } from "@/components/Boletas";
+import { CarritoProvider } from "@/lib/carrito";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background p-4">
+    <>
       {/* Clerk decide cuál bloque se muestra según el estado de sesión. */}
       <SignedOut>
-        <LoginScreen />
+        <main className="flex min-h-svh items-center justify-center bg-muted/40 p-4">
+          {/* Vista directa de inicio de sesión / crear cuenta. */}
+          <SignIn routing="hash" />
+        </main>
       </SignedOut>
       <SignedIn>
-        <Dashboard />
+        <CarritoProvider>
+          <div className="min-h-svh bg-background">
+            <Header />
+            <Routes>
+              <Route path="/" element={<Catalogo />} />
+              <Route path="/receipt" element={<Boletas />} />
+              {/* Cualquier ruta desconocida vuelve a la tienda. */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
+          <Toaster />
+        </CarritoProvider>
       </SignedIn>
-    </main>
-  );
-}
-
-// --- Sin sesión: login ------------------------------------------------------
-function LoginScreen() {
-  return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Carvuk</CardTitle>
-        <CardDescription>Iniciá sesión para continuar.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {/* Clerk clona el botón y le inyecta el onClick que abre el modal. */}
-        <SignInButton mode="modal">
-          <Button className="w-full">Iniciar sesión</Button>
-        </SignInButton>
-      </CardContent>
-    </Card>
-  );
-}
-
-// --- Con sesión: pantalla con el nombre + cerrar sesión ---------------------
-function Dashboard() {
-  const { user } = useUser();
-
-  // Clerk no garantiza fullName/firstName según el método de registro;
-  // bajamos por la cadena hasta algo siempre presente (el email).
-  const displayName =
-    user?.fullName ||
-    user?.firstName ||
-    user?.username ||
-    user?.primaryEmailAddress?.emailAddress ||
-    "usuario";
-
-  return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardDescription>Sesión activa</CardDescription>
-        <CardTitle className="text-xl">Hola, {displayName}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Esta es una pantalla de ejemplo. Estás dentro.
-        </p>
-      </CardContent>
-      <CardFooter>
-        <SignOutButton>
-          <Button variant="outline" className="w-full">
-            Cerrar sesión
-          </Button>
-        </SignOutButton>
-      </CardFooter>
-    </Card>
+    </>
   );
 }
 
